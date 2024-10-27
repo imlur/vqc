@@ -46,6 +46,9 @@ ntensors(::Type{LocalLadder}, q, d) = q * d
 matsize(::Type{LocalLadder}, q, d) = q, d
 nth_tensor_idx(::Type{LocalLadder}, l, i) = (i%l.ts.q+1, div(i-1,l.ts.q)+1)
 
+isvalidind(::Type{LocalLadder}, l, i, j) = true
 process_args(::Type{LocalLadder}) = ()
-gettag(::Type{LocalLadder}, q, d, i, j, l::LocalLadder) = 
-	(tlin(q, d, i, j)..., tlout(q, d, i, j)...)
+function gettag(::Type{LocalLadder}, l, i, j) 
+	q, d = l.ts.q, l.ts.d
+	return (tlin(q, d, i, j)..., tlout(q, d, i, j)...)
+end

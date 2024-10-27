@@ -1,7 +1,11 @@
+using Distributions
 using LinearAlgebra
 using ITensors
 
 abstract type LocalCircuit end
+const normaldist = Normal(0, 1)
+# TODO: enable user to change \sigma
+const weakdist = Normal(0, 0.0005)
 
 struct LocalTensors
 	tensors::Matrix{ITensor}
@@ -11,20 +15,24 @@ struct LocalTensors
 	ntensor::Int
 end
 
-function buildtensors(::Type{T}, q, d, ii, l::T, a...) where {T<:LocalCircuit}
+function createlocal(::Type{T}, q, d, ii::Index, l::T, a...) where {T<:LocalCircuit}
 	@assert q == l.ts.q && d > l.ts.d
 	row, col = matsize(T, q, d, a...)
 	tags = Matrix{NTuple{4, String}}(undef, row, col)
 	tensors = Matrix{ITensor}(undef, row, col)
+	ts = LocalTensors(tensors, ii, q, d, ntensors(T, q, d))
+	obj = T(ts, process_args(T, a...)...)
 	for i=1:row
 		for j=1:col
-			tags[i, j] = gettag(T, q, d, i, j, l, a...)
-			t::Array{Float64, 4} = getarr(T, q, d, i, j, l)
-			inds = (settags(ii, tg) for tg in tags[i, j])
-			tensors[i, j] = ITensor(t, inds...)
+			if isvalidind(T, obj, i, j, a...)
+				tags[i, j] = gettag(T, obj, i, j, a...)
+				t::Array{Float64, 4} = getarr(T, i, j, l)
+				inds = (settags(ii, tg) for tg in tags[i, j])
+				obj.ts.tensors[i, j] = ITensor(t, inds...)
+			end
 		end
 	end
-	return tensors
+	return obj
 end # Initialize from shallow Local ladder circuit with same number of qubits.
 
 createlocal(::Type{T}) where T = T(nothing)
@@ -34,13 +42,6 @@ createlocal(::Type{T}, q, d, ii::Index, a...) where T =
 	createlocal(T, q, d, ii, T(q), a...)
 createlocal(::Type{T}, q, d, l::T, a...) where T = 
 	createlocal(T, q, d, Index(2), l, a...)
-
-function createlocal(::Type{T}, q, d, ii::Index, l::T, a...) where {T<:LocalCircuit}
-	ts = LocalTensors(buildtensors(T, q, d, ii, l, a...),
-		ii, q, d, ntensors(T, q, d))
-	other_args = process_args(T, a...)
-	return T(ts, other_args...)
-end
 
 nth_tensor(l::T, i) where {T<:LocalCircuit} = 
 	l.ts.tensors[nth_tensor_idx(T, l, i)...]
@@ -63,20 +64,37 @@ function contract(l, s, e, t)
 	return t
 end
 
-# TODO: change the code to "Uniform" SO(4) (4 4D vectors and orthonormalize)
-# TODO: give small noise to resultant matrix
 # TODO: separate identity part to another function
-function getarr(::Type{T}, q, d, i, j, l::T) where {T}
+function getarr(::Type{T}, i, j, l::T) where {T}
 	if l.ts.d == 0
-		A = rand(4, 4)
-		return reshape(exp((A - A')/2), 2, 2, 2, 2)
+		return reshape(uniformso4(), 2, 2, 2, 2)
 	elseif j <= l.ts.d
 		t = l.ts.tensors[i, j].tensor
-		return reshape(Vector(t.storage), 2, 2, 2, 2)
+		noise_added = reshape(Vector(t.storage), 4, 4) * wnoise()
+		return reshape(noise_added, 2, 2, 2, 2)
 	else
-		t = reshape(Matrix(I, 4, 4), 2, 2, 2, 2)
+		t = reshape(wnoise(), 2, 2, 2, 2)
 		return permutedims(t, [1, 2, 4, 3])
 	end
+end
+wnoise() = (A = rand(weakdist, 4, 4); exp((A - A')/2))
+
+function uniformso4()
+	vectors = [rand(normaldist, 4) for i=1:4]
+	so4 = hcat(ortho(vectors...)...)
+	if det(so4) < 0
+		so4[:, 4] = -so4[:, 4]
+	end
+	return so4 
+end
+
+ortho() = Vector{Float64}[]
+function ortho(v::Vector{Float64}, others::Vector{Float64}...)
+	result_before::Vector{Vector{Float64}} = ortho(others...)
+	for vb in result_before
+		v = v - dot(v, vb) * vb
+	end
+	return [v / norm(v), result_before...]
 end
 
 include("LocalLadder.jl")
