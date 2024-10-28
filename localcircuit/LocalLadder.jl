@@ -7,13 +7,13 @@ function tlin(q, d, i, j)
 		if i == 1
 			t1, t2 = "in,q1", "in,q2"
 		else
-			t1, t2 = "$(i)-$(j),$(i-1)-$(j)", "in,q$(i+1)"
+			t1, t2 = coord(i, j, i-1, j), "in,q$(i+1)"
 		end
 	else
 		if i == 1
-			t1, t2 = "$(i)-$(j),$(i)-$(j-1)", "$(i)-$(j),$(i+1)-$(j-1)"
+			t1, t2 = coord(i, j, i, j-1), coord(i, j, i+1, j-1)
 		else
-			t1, t2 = "$(i)-$(j),$(i-1)-$(j)", "$(i)-$(j),$(min(i+1, q))-$(j-1)"
+			t1, t2 = coord(i, j, i-1, j), coord(i, j, min(i+1, q), j-1)
 		end
 	end
 	return (t1, t2)
@@ -24,14 +24,13 @@ function tlout(q, d, i, j)
 		if i == q
 			t1, t2 = "out,q$(q+1)", "out,q$(q)"
 		else
-			t1, t2 = "$(i)-$(j),$(i+1)-$(j)", "out,q$(i)"
+			t1, t2 = coord(i, j, i+1, j), "out,q$(i)"
 		end
 	else
 		if i == q
-			t1, t2 = "$(i)-$(j),$(i)-$(j+1)", "$(i)-$(j),$(i-1)-$(j+1)"
+			t1, t2 = coord(i, j, i, j+1), coord(i, j, i-1, j+1)
 		else
-			t1, t2 = "$(i)-$(j),$(i+1)-$(j)", "$(i)-$(j),$(max(i-1, 1))-$(j+1)"
-
+			t1, t2 = coord(i, j, i+1, j), coord(i, j, max(i-1, 1), j+1)
 		end
 	end
 	return (t1, t2)

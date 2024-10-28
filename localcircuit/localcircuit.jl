@@ -20,7 +20,7 @@ function createlocal(::Type{T}, q, d, ii::Index, l::T, a...) where {T<:LocalCirc
 	row, col = matsize(T, q, d, a...)
 	tags = Matrix{NTuple{4, String}}(undef, row, col)
 	tensors = Matrix{ITensor}(undef, row, col)
-	ts = LocalTensors(tensors, ii, q, d, ntensors(T, q, d))
+	ts = LocalTensors(tensors, ii, q, d, ntensors(T, q, d, a...))
 	obj = T(ts, process_args(T, a...)...)
 	for i=1:row
 		for j=1:col
@@ -64,7 +64,7 @@ function contract(l, s, e, t)
 	return t
 end
 
-# TODO: separate identity part to another function
+# TODO: separate identity part to another function (if necessary)
 function getarr(::Type{T}, i, j, l::T) where {T}
 	if l.ts.d == 0
 		return reshape(uniformso4(), 2, 2, 2, 2)
@@ -96,6 +96,8 @@ function ortho(v::Vector{Float64}, others::Vector{Float64}...)
 	end
 	return [v / norm(v), result_before...]
 end
+
+coord(i1, j1, i2, j2) = "$(i1)-$(j1),$(i2)-$(j2)"
 
 include("LocalLadder.jl")
 include("LocalBW.jl")
