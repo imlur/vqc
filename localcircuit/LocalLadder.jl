@@ -2,12 +2,12 @@ struct LocalLadder <: LocalCircuit
 	ts::LocalTensors
 end
 
-function tlin(q, d, i, j)
+function tlin(q, d, i, j, itags, otags)
 	if j == 1
 		if i == 1
-			t1, t2 = "in,q1", "in,q2"
+			t1, t2 = itags[1], itags[2]
 		else
-			t1, t2 = coord(i, j, i-1, j), "in,q$(i+1)"
+			t1, t2 = coord(i, j, i-1, j), itags[i+1]
 		end
 	else
 		if i == 1
@@ -19,12 +19,12 @@ function tlin(q, d, i, j)
 	return (t1, t2)
 end
 
-function tlout(q, d, i, j)
+function tlout(q, d, i, j, itags, otags)
 	if j == d
 		if i == q
-			t1, t2 = "out,q$(q+1)", "out,q$(q)"
+			t1, t2 = otags[q+1], otags[q]
 		else
-			t1, t2 = coord(i, j, i+1, j), "out,q$(i)"
+			t1, t2 = coord(i, j, i+1, j), otags[i]
 		end
 	else
 		if i == q
@@ -37,17 +37,17 @@ function tlout(q, d, i, j)
 end
 
 
-LocalLadder(q) = LocalLadder(LocalTensors(Matrix{ITensor}(undef, 0, 0), 
-	Index(0), q, 0, 0))
-LocalLadder(args...) = createlocal(LocalLadder, args...)
+LocalLadder(args...; kw...) = createlocal(LocalLadder, args...; kw...)
 
 ntensors(::Type{LocalLadder}, q, d) = q * d
 matsize(::Type{LocalLadder}, q, d) = q, d
+nlines(lc::LocalLadder) = lc.ts.q + 1
 nth_tensor_idx(::Type{LocalLadder}, l, i) = (i%l.ts.q+1, div(i-1,l.ts.q)+1)
 
 isvalidind(::Type{LocalLadder}, l, i, j) = true
 process_args(::Type{LocalLadder}) = ()
-function gettag(::Type{LocalLadder}, l, i, j) 
+function gettag(::Type{LocalLadder}, l, i, j,
+				itags::Vector{String}, otags::Vector{String}) 
 	q, d = l.ts.q, l.ts.d
-	return (tlin(q, d, i, j)..., tlout(q, d, i, j)...)
+	return (tlin(q, d, i, j, itags, otags)..., tlout(q, d, i, j, itags, otags)...)
 end

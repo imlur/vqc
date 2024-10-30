@@ -3,14 +3,14 @@ struct LocalBW <: LocalCircuit
 	flipped::Bool
 end
 
-process_args(::Type{LocalBW}, b::Bool) = (b,)
+fdef() = false
 
-LocalBW(q) = LocalBW(LocalTensors(Matrix{ITensor}(undef, 0, 0),
-	Index(0), q, 0, 0), true)
-LocalBW(args...) = createlocal(LocalBW, args...)
-function ntensors(::Type{LocalBW}, q, d, b::Bool)
+process_args(::Type{LocalBW}, b=fdef()::Bool) = (b,)
+
+LocalBW(args...; kw...) = createlocal(LocalBW, args...; kw...)
+function ntensors(::Type{LocalBW}, q, d, b=fdef()::Bool)
 	if q == 1
-		return (1, 1)
+		return 1
 	elseif q % 2 == 0 || d % 2 == 0
 		return div(q * d, 2)
 	else
@@ -18,8 +18,9 @@ function ntensors(::Type{LocalBW}, q, d, b::Bool)
 		return base + (b ? div(q - 1, 2) : div(q + 1, 2))
 	end
 end
-matsize(::Type{LocalBW}, q, d, b::Bool) = get_row(q), q == 1 ? 1 : d
+matsize(::Type{LocalBW}, q, d, b=fdef()::Bool) = get_row(q), q == 1 ? 1 : d
 get_row(q) = q % 2 == 1 ? div(q + 1, 2) : div(q, 2)
+nlines(lc::LocalBW) = lc.ts.q + 1
 function nth_tensor_idx(::Type{LocalBW}, l, i)
 	q, flip = l.ts.q, l.flipped
 	if q == 1
@@ -34,16 +35,26 @@ function nth_tensor_idx(::Type{LocalBW}, l, i)
 	end
 end
 
-function isvalidind(::Type{LocalBW}, l, i, j, b::Bool) 
-	q, d = l.ts.q, l.ts.d
+function isvalidind(::Type{LocalBW}, l, i, j) 
+	q, d, b = l.ts.q, l.ts.d, l.flipped
 	row, col = size(l.ts.tensors)
 	!(q % 2 == 1 && i == row && ((b && j % 2 == 1) || (!b && j % 2 == 0)))
 end
 
-# Example : LocalBW(4, 7) - layer1 : 3 gates, layer2 : 2 gates 
-process_args(::Type{LocalBW}, b::Bool) = (b, )
+fromexisting(i, j, l::LocalBW, b=fdef()::Bool) = 
+	(b == l.flipped && j <= l.ts.d) || 
+	(b != l.flipped && 2 <= j && j <= l.ts.d + 1)
 
-function gettag(::Type{LocalBW}, l, i, j, flip::Bool)
+getexisting(i, j, l::LocalBW, b=fdef()::Bool) =
+	b == l.flipped ? l.ts.tensors[i, j] : l.ts.tensors[i, j-1]
+
+
+# Example : LocalBW(4, 7) - layer1 : 3 gates, layer2 : 2 gates 
+process_args(::Type{LocalBW}, b=fdef()::Bool) = (b, )
+
+function gettag(::Type{LocalBW}, l, i, j, 
+				itags::Vector{String}, otags::Vector{String}, 
+				flip=fdef()::Bool)
 	row, col = size(l.ts.tensors); q = l.ts.q
 	layer2 = (flip && j % 2 == 1) || (!flip && j % 2 == 0)
 	if layer2 # div(q , 2) gates
@@ -66,30 +77,30 @@ function gettag(::Type{LocalBW}, l, i, j, flip::Bool)
 	# For cases where jth column is at edge of matrix
 	if j == 1
 		if layer2
-			t1, t2 = "in,q$(2*i)", "in,q$(2*i+1)"
+			t1, t2 = itags[2*i], itags[2*i+1]
 		else
-			t1, t2 = "in,q$(2*i-1)", "in,q$(2*i)"
+			t1, t2 = itags[2*i-1], itags[2*i]
 		end
 	elseif j == 2 && layer2 && i == row && q % 2 == 0
-		t2 = "in,q$(q+1)"
+		t2 = itags[q+1]
 	elseif j == 2 && !layer2 && i == row && q % 2 == 1
-		t2 = "in,q$(q+1)"
+		t2 = itags[q+1]
 	elseif j == 2 && !layer2 && i == 1
-		t1 = "in,q1"
+		t1 = itags[1]
 	end
 
 	if j == col
 		if layer2
-			t3, t4 = "out,q$(2*i+1)", "out,q$(2*i)"
+			t3, t4 = otags[2*i+1], otags[2*i]
 		else
-			t3, t4 = "out,q$(2*i)", "out,q$(2*i-1)"
+			t3, t4 = otags[2*i], otags[2*i-1]
 		end
 	elseif j == col-1 && layer2 && i == row && q % 2 == 0
-		t3 = "out,q$(q+1)"
+		t3 = otags[q+1]
 	elseif j == col-1 && !layer2 && i == row && q % 2 == 1
-		t3 = "out,q$(q+1)"
+		t3 = otags[q+1]
 	elseif j == col-1 && !layer2 && i == 1
-		t4 = "out,q1"
+		t4 = otags[1]
 	end
 	return (t1, t2, t3, t4)
 end

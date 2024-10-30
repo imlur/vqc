@@ -9,12 +9,13 @@ struct QMPS_1Block{T<:LocalCircuit} <: QMPS{T}
 	blk::QMPSBlocks{T}
 end
 
-QMPS_1Block{T}(L, q, d) where {T} = QMPS_1Block{T}(L, q, d, QMPS_1Block{T}())
+#blocksizes(::Type{QMPS_1Block{T}}, L, q, d) where {T} = [(q, d)]
+nblocks(::Type{QMPS_1Block{T}}, L, q, d) where {T} = 1
+blocksize(::Type{QMPS_1Block{T}}, L, q, d, i) where {T} = q, d
 
-# TODO: add initialization code similar to localcircuit structs
-function QMPS_1Block{T}(L, q, d, g::QMPS_1Block{T}) where {T}
-	@assert L == g.ts.L && q == g.ts.q && d > g.ts.d
-	locals = Vector{T}(undef, L)
-	params = get_params(locals)
-	QMPS_1Block{T}(locals, params, L, q, d)
-end
+QMPS_1Block{T}(L, d, ig, a...) where {T} =
+	createglobal(QMPS_1Block{T}, L, L-1, d, ig, a...)
+
+QMPS_1Block{T}(L, q, d::Int, a...) where {T} = 
+	(@assert q == L - 1; createglobal(QMPS_1Block{T}, L, q, d, a...))
+
