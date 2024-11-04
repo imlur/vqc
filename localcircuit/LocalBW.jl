@@ -20,7 +20,7 @@ function ntensors(::Type{LocalBW}, q, d, b=fdef()::Bool)
 end
 matsize(::Type{LocalBW}, q, d, b=fdef()::Bool) = get_row(q), q == 1 ? 1 : d
 get_row(q) = q % 2 == 1 ? div(q + 1, 2) : div(q, 2)
-nlines(lc::LocalBW) = lc.ts.q + 1
+nlines(::Type{LocalBW}, q) = q + 1
 function nth_tensor_idx(::Type{LocalBW}, l, i)
 	q, flip = l.ts.q, l.flipped
 	if q == 1
@@ -36,27 +36,31 @@ function nth_tensor_idx(::Type{LocalBW}, l, i)
 end
 
 function isvalidind(::Type{LocalBW}, l, i, j) 
+	(l.ts.q == 1) && return true
 	q, d, b = l.ts.q, l.ts.d, l.flipped
 	row, col = size(l.ts.tensors)
 	!(q % 2 == 1 && i == row && ((b && j % 2 == 1) || (!b && j % 2 == 0)))
 end
 
 fromexisting(i, j, l::LocalBW, b=fdef()::Bool) = 
+	(l.ts.q == 1) || 
 	(b == l.flipped && j <= l.ts.d) || 
 	(b != l.flipped && 2 <= j && j <= l.ts.d + 1)
 
-getexisting(i, j, l::LocalBW, b=fdef()::Bool) =
+function getexisting(i, j, l::LocalBW, b=fdef()::Bool)
+	(l.ts.q == 1) && return l.ts.tensors[1, 1]
 	b == l.flipped ? l.ts.tensors[i, j] : l.ts.tensors[i, j-1]
-
+end
 
 # Example : LocalBW(4, 7) - layer1 : 3 gates, layer2 : 2 gates 
 process_args(::Type{LocalBW}, b=fdef()::Bool) = (b, )
 
 function gettag(::Type{LocalBW}, l, i, j, 
-				itags::Vector{String}, otags::Vector{String}, 
+				itags::Vector{String}, 
+				otags::Vector{String}, 
 				flip=fdef()::Bool)
 	row, col = size(l.ts.tensors); q = l.ts.q
-	layer2 = (flip && j % 2 == 1) || (!flip && j % 2 == 0)
+	layer2 = (q != 1) && ((flip && j % 2 == 1) || (!flip && j % 2 == 0))
 	if layer2 # div(q , 2) gates
 		t1, t2 = coord(i, j, i, j-1), coord(i, j, i+1, j-1)
 		t3, t4 = coord(i, j, i+1, j+1), coord(i, j, i, j+1)

@@ -9,7 +9,6 @@ struct QMPS_1Block{T<:LocalCircuit} <: QMPS{T}
 	blk::QMPSBlocks{T}
 end
 
-#blocksizes(::Type{QMPS_1Block{T}}, L, q, d) where {T} = [(q, d)]
 nblocks(::Type{QMPS_1Block{T}}, L, q, d) where {T} = 1
 blocksize(::Type{QMPS_1Block{T}}, L, q, d, i) where {T} = q, d
 

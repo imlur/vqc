@@ -41,13 +41,14 @@ LocalLadder(args...; kw...) = createlocal(LocalLadder, args...; kw...)
 
 ntensors(::Type{LocalLadder}, q, d) = q * d
 matsize(::Type{LocalLadder}, q, d) = q, d
-nlines(lc::LocalLadder) = lc.ts.q + 1
+nlines(::Type{LocalLadder}, q) = q + 1
 nth_tensor_idx(::Type{LocalLadder}, l, i) = (i%l.ts.q+1, div(i-1,l.ts.q)+1)
 
 isvalidind(::Type{LocalLadder}, l, i, j) = true
 process_args(::Type{LocalLadder}) = ()
 function gettag(::Type{LocalLadder}, l, i, j,
-				itags::Vector{String}, otags::Vector{String}) 
+				itags::Vector{String}, 
+				otags::Vector{String}) 
 	q, d = l.ts.q, l.ts.d
 	return (tlin(q, d, i, j, itags, otags)..., tlout(q, d, i, j, itags, otags)...)
 end

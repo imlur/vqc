@@ -13,6 +13,8 @@ struct LocalTensors
 	q::Int
 	d::Int
 	ntensor::Int
+	itags::Vector{String}
+	otags::Vector{String}
 end
 
 check_qd(q, d, ::Nothing) = nothing
@@ -20,17 +22,19 @@ check_qd(q, d, l::LocalCircuit) = @assert q == l.ts.q && d > l.ts.d
 
 # TODO: change this function (or other createlocal methods)
 # not to make error with it, ot arguments
+# it / ot is nothing -> default tags (input,q$(i) / output,q$(i))
+# it / ot is set to Vector{String} -> input, output tags are set to them
 function createlocal(::Type{T}, q, d, ii::Index, l::Union{T, Nothing}, 
 					 a...; it=nothing, ot=nothing) where {T<:LocalCircuit}
 	check_qd(q, d, l)
 	row, col = matsize(T, q, d, a...)
 	tags = Matrix{NTuple{4, String}}(undef, row, col)
 	tensors = Matrix{ITensor}(undef, row, col)
-	ts = LocalTensors(tensors, ii, q, d, ntensors(T, q, d, a...))
+	itags = (it===nothing) ? [itag(i) for i=1:nlines(T, q)] : it
+	otags = (ot===nothing) ? [otag(i) for i=1:nlines(T, q)] : ot
+	ts = LocalTensors(tensors, ii, q, d, ntensors(T, q, d, a...), itags, otags)
 	obj = T(ts, process_args(T, a...)...)
-	itags = (it===nothing) ? [itag(i) for i=1:nlines(obj)] : it
-	otags = (ot===nothing) ? [otag(i) for i=1:nlines(obj)] : ot
-	@assert nlines(obj) == length(itags) && nlines(obj) == length(otags)
+	@assert nlines(T, q) == length(itags) && nlines(T, q) == length(otags)
 	for i=1:row
 		for j=1:col
 			if isvalidind(T, obj, i, j)
@@ -108,8 +112,8 @@ function ortho(v::Vector{Float64}, others::Vector{Float64}...)
 end
 
 coord(i1, j1, i2, j2) = "$(i1)-$(j1),$(i2)-$(j2)"
-itag(i) = "input$(i)"
-otag(i) = "output$(i)"
+itag(i) = "input,q$(i)"
+otag(i) = "output,q$(i)"
 
 include("LocalLadder.jl")
 include("LocalBW.jl")

@@ -1,13 +1,12 @@
 abstract type QMPS{T} end
 
-# TODO: add initialization code similar to localcircuit structs
-
 struct QMPSBlocks{T}
 	locals::Vector{T}
 	params::Vector{Array{NTuple{6, Float64}, 2}}
 	L::Int
 	q::Int
 	d::Int
+	i::Index
 end
 
 gettensor(g::QMPS, bidx, i, j) = g.blk.locals[bidx].ts.tensors[i, j]
@@ -25,9 +24,10 @@ localtype(::Type{<:QMPS{T}}) where {T <: LocalCircuit} = T
 function createglobal(::Type{T}, L, q, d, ii::Index, g::Union{T, Nothing}) where {T <: QMPS}
 	blocks = getblocks(T, L, q, d, ii, g)
 	params = getparams(blocks)
-	T(QMPSBlocks{localtype(T)}(blocks, params, L, q, d))
+	T(QMPSBlocks{localtype(T)}(blocks, params, L, q, d, ii))
 end
 
+nblocks(g::QMPS) = nblocks(typeof(g), g.blk.L, g.blk.q, g.blk.d)
 function getblocks(::Type{T}, L, q, d, ii, g::Union{T, Nothing}) where {T}
 	nb = nblocks(T, L, q, d)
 	S = localtype(T)
@@ -85,8 +85,25 @@ function paramtoarr(p::NTuple{6, Float64})
 	return permutedims(expo, [1, 2, 4, 3])
 end
 
-# TODO: implement contraction
-# contract(
+function getinit(g::QMPS) 
+	ind = g.blk.i
+	itags = g.blk.locals[1].ts.itags
+	inds = [settags(ind, tag) for tag in itags]
+	tensor = ITensor(0.0, inds...)
+	tensor[[1 for _=1:length(inds)]...] = 1.0
+	return tensor
+end
+contract(g::QMPS) = contract(g, getinit(g))
+prepnextcont(g::QMPS, t::ITensor, i) = prepnextcont(typeof(g), g, t, i)
+function contract(g::QMPS, t::ITensor)
+	for (i, blk) in enumerate(g.blk.locals)
+		t = contract(blk, t)
+		if i < nblocks(g)
+			t = prepnextcont(g, t, i)
+		end
+	end
+	return t
+end
 
 include("QMPS_1Block.jl")
 include("QMPS_LBlocks.jl")
