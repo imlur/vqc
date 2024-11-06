@@ -17,7 +17,7 @@ function auxargs(::Type{QMPS_LBlocks{LocalBW}}, L, q, d, i)
 		return (false,)
 	else
 		start = L - q + 1
-		return ((i - start) % 2 == 0,)
+		return (i >= start && (i - start) % 2 == 0,)
 	end
 end
 
@@ -38,9 +38,9 @@ end
 QMPS_LBlocks{T}(a...) where {T} = createglobal(QMPS_LBlocks{T}, a...)
 
 function prepnextcont(::Type{QMPS_LBlocks{T}}, g, t, i) where {T}
-	if i < g.blk.L - g.blk.q
-		ind, nextblk = g.blk.i, g.blk.locals[i+1]
-		tag2add = nextblk.ts.itags[1]
+	if i < ssize(g) - qb(g)
+		ind, nextblk = idx(g), g[i+1]
+		tag2add = itags(nextblk)[1]
 		return t * ITensor([1, 0], settags(ind, tag2add))
 	end
 	return t

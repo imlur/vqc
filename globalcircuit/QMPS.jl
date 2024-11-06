@@ -3,14 +3,17 @@ abstract type QMPS{T} end
 struct QMPSBlocks{T}
 	locals::Vector{T}
 	params::Vector{Array{NTuple{6, Float64}, 2}}
-	L::Int
-	q::Int
-	d::Int
-	i::Index
+	ssize::Int
+	qb::Int
+	dep::Int
+	idx::Index
 end
 
-gettensor(g::QMPS, bidx, i, j) = g.blk.locals[bidx].ts.tensors[i, j]
-check_qd(q, d, g::QMPS) = @assert q == g.blk.q && d > g.blk.d
+# g[i] when g::QMPS : ith block of g
+Base.getindex(g::QMPS, i::Int) = g.blk.locals[i]
+for f in fieldnames(QMPSBlocks)	@eval $f(g::QMPS) = g.blk.$f end
+
+check_qd(q, d, g::QMPS) = @assert q == qb(g) && d > dep(g)
 
 createglobal(::Type{T}, L, q, d) where T =
 	createglobal(T, L, q, d, Index(2))
@@ -27,7 +30,7 @@ function createglobal(::Type{T}, L, q, d, ii::Index, g::Union{T, Nothing}) where
 	T(QMPSBlocks{localtype(T)}(blocks, params, L, q, d, ii))
 end
 
-nblocks(g::QMPS) = nblocks(typeof(g), g.blk.L, g.blk.q, g.blk.d)
+nblocks(g::QMPS) = nblocks(typeof(g), ssize(g), qb(g), dep(g))
 function getblocks(::Type{T}, L, q, d, ii, g::Union{T, Nothing}) where {T}
 	nb = nblocks(T, L, q, d)
 	S = localtype(T)
@@ -47,7 +50,7 @@ auxargs(::Any, L, q, d, i) = ()
 getitags(::Any, L, q, d, i) = nothing
 getotags(::Any, L, q, d, i) = nothing
 getithblock(::Nothing, i) = nothing
-getithblock(g::T, i) where {T<:QMPS} = g.blk.locals[i]
+getithblock(g::T, i) where {T<:QMPS} = g[i]
 
 getparams(blocks::Vector{T}) where {T <: LocalCircuit} =
 	[getparam(b) for b in blocks]
@@ -86,9 +89,9 @@ function paramtoarr(p::NTuple{6, Float64})
 end
 
 function getinit(g::QMPS) 
-	ind = g.blk.i
-	itags = g.blk.locals[1].ts.itags
-	inds = [settags(ind, tag) for tag in itags]
+	ind = idx(g)
+	itgs = itags(g[1])
+	inds = [settags(ind, tag) for tag in itgs]
 	tensor = ITensor(0.0, inds...)
 	tensor[[1 for _=1:length(inds)]...] = 1.0
 	return tensor
@@ -104,6 +107,18 @@ function contract(g::QMPS, t::ITensor)
 	end
 	return t
 end
+
+function Base.show(io::IO, ::MIME"text/plain", g::T) where {T<:QMPS}
+	print(T, ", L = $(ssize(g)), q = $(qb(g)), d = $(dep(g))")
+	println()
+	nb = nblocks(g)
+	for i=1:nb
+		println()
+		print("Block $(i): \t")
+		Base.show(io, "text/plain", g[i])
+	end
+end
+
 
 include("QMPS_1Block.jl")
 include("QMPS_LBlocks.jl")
